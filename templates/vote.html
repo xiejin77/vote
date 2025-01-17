@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投票 - {{ voting_item }}</title>
+
+    <!-- 引入 Paillier 加密和相关依赖 -->
+    <script src="{{ url_for('static', filename='jsbn.js') }}"></script>
+    <script src="{{ url_for('static', filename='jsbn2.js') }}"></script>
+    <script src="{{ url_for('static', filename='prng4.js') }}"></script>
+    <script src="{{ url_for('static', filename='rng.js') }}"></script>
+    <script src="{{ url_for('static', filename='paillier.js') }}"></script>
+    
+    <!-- 页面样式 -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button, a {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover, a:hover {
+            background-color: #0056b3;
+        }
+
+        a {
+            display: inline-block; /* Allows padding and hover effect */
+        }
+    </style>
+    <!-- JavaScript 脚本 -->
+    <script>
+        // 假设从服务器接收的公钥的 'n' 值是公开的并存储在某处
+        let nValue = "{{ public_key_n }}"; // 使用 Flask 将 n 值传递给模板
+
+        // 创建 Paillier 公钥对象
+        let publicKey = new paillier.publicKey(2048, new BigInteger(nValue));
+
+        function castVote(isApprove) {
+            // 防止表单默认提交行为
+            event.preventDefault();
+
+            // 将投票选项转换为 BigInteger （赞成为 1，反对为 0）
+            let voteValue = isApprove ? 1 : 0;
+            let vote = new BigInteger(String(voteValue), 10);
+            console.log("投票选项（未加密）: " + voteValue); // 调试信息
+            // 使用 Paillier 公钥加密投票
+            let encryptedVote = publicKey.encrypt(vote);
+            console.log("加密后的投票数据: " + encryptedVote); // 调试信息
+            // 将加密后的投票发送到服务器
+            sendEncryptedVote(encryptedVote.toString());
+        }
+
+        function sendEncryptedVote(encryptedVote) {
+            console.log("正在发送加密投票数据到服务器..."); // 调试信息
+            fetch('/submit_vote', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ vote: encryptedVote })
+            })
+            .then(response => {
+            if (!response.ok) {
+            throw new Error('Network response was not ok');
+            }
+            return response.json();
+            })
+            .then(data => {
+                console.log('Success:', data);
+                if (data.status === 'success') {
+                alert('投票成功: ' + data.message);
+                } 
+                else {
+                alert('投票失败: ' + data.message);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>投票事项: {{ voting_item }}</h1>
+        <div class="buttons">
+            <!-- 投票选项 -->
+            <button onclick="castVote(true)">赞成</button>
+            <button onclick="castVote(false)">反对</button>
+        </div>
+        <div class="buttons">
+            <a href="/logout">退出系统</a>
+        </div>
+    </div>
+</body>
+</html>
